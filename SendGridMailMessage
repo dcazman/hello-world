@@ -1,0 +1,46 @@
+function Send-SendGridMailMessage {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)][String[]]$To,
+        [Parameter(Mandatory)][String]$Subject,
+        [String]$Body,
+        [Parameter(Mandatory)][String]$From,
+        [Switch]$BodyAsHtml,
+        [String]$SendGridApiKey = $env:SENDGRID_API_KEY
+    )
+    if (-not $SendGridApiKey) {
+        throw "You need to supply a Sendgrid API key either via the -SendGridApiKey parameter or by setting the SENDGRID_API_KEY environment variable"
+    }
+
+    $SendGridMessage = @{
+        personalizations = @()
+        from = @{email=$from}
+        content = @(@{
+            type  = if ($BodyAsHtml) {'text/html'} else {'text/plain'}
+            value = $Body
+        })
+    }
+
+    $Personalization = @{
+        to      = @()
+        subject = $Subject
+    }
+
+    $To.foreach{
+        $Personalization.To += @{email=$PSItem}
+    }
+
+    $SendGridMessage.personalizations += $Personalization
+
+    $InvokeRestMethodParams = @{
+        URI            = 'https://api.sendgrid.com/v3/mail/send'
+        Authentication = 'Bearer'
+        Token          = (Convertto-securestring -asplaintext -force $SendGridApiKey)
+        Method         = 'POST'
+        Body           = ($SendGridMessage | ConvertTo-Json -Depth 5)
+        ContentType    = 'application/json'
+    }
+
+    Invoke-RestMethod @InvokeRestMethodParams
+    write-verbose ($sendgridmessage | ConvertTo-Json -depth 5)
+}
